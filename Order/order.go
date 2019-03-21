@@ -266,7 +266,7 @@ func (o *orders) matchQt() error {
 
 		qt, loc := getTotalLocs(svItem)
 		if qt == 0 {
-			msg.Attachments[0].Fallback = "at of " + sku + " is zero now so will not be added to order."
+			msg.Text += "Qt of " + sku + " is now 0 so it will not be added to order."
 			slackerr.Send(slackHook, msg, nil)
 		}
 		itm := item{}
