@@ -1,6 +1,6 @@
 package order
 
-type SsOrder struct {
+type ssOrder struct {
 	OrderID                  int
 	OrderNumber              string
 	OrderKey                 string
@@ -13,9 +13,9 @@ type SsOrder struct {
 	CustomerID               int
 	CustomerUsername         string
 	CustomerEmail            string
-	BillTo                   BillTo
-	ShipTo                   ShipTo
-	Items                    []SsItem
+	BillTo                   billTo
+	ShipTo                   shipTo
+	Items                    []ssItem
 	OrderTotal               float32
 	AmountPaid               float32
 	TaxAmount                float32
@@ -36,14 +36,14 @@ type SsOrder struct {
 	Dimensions               interface{}
 	InsuranceOptions         interface{}
 	InternationalOptions     interface{}
-	AdvancedOptions          AdvancedOptions
+	AdvancedOptions          advancedOptions
 	TagIDs                   []int
 	UserID                   string
 	ExternallyFulfilled      bool
 	ExternallyFulfilledBy    string
 }
 
-type SsItem struct {
+type ssItem struct {
 	OrderItemID       int
 	LineItemKey       string
 	SKU               string
@@ -64,7 +64,7 @@ type SsItem struct {
 	ModifyDate        string
 }
 
-type AdvancedOptions struct {
+type advancedOptions struct {
 	WarehouseID       int
 	NonMachinable     bool
 	SaturdayDelivery  bool
@@ -83,7 +83,7 @@ type AdvancedOptions struct {
 	BillToCountryCode interface{}
 }
 
-type BillTo struct {
+type billTo struct {
 	Name        string
 	Company     string
 	Street1     string
@@ -97,7 +97,7 @@ type BillTo struct {
 	Residential bool
 }
 
-type ShipTo struct {
+type shipTo struct {
 	Name        string
 	Company     string
 	Street1     string
@@ -111,7 +111,7 @@ type ShipTo struct {
 	Residential bool
 }
 
-type ShipStation struct {
+type shipStation struct {
 	inited bool
 
 	key,

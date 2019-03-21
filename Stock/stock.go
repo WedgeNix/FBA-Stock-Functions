@@ -48,6 +48,7 @@ type svData struct {
 	UPC         string
 	Brand       string
 	AvailableQt int
+	SvTitle     string
 }
 
 type svDatas map[string]svData
@@ -129,7 +130,6 @@ type brandReg map[string]*regexp.Regexp
 
 // Stock function to get fba stock data to find out what to buy and to send to FBA.
 func Stock(w http.ResponseWriter, r *http.Request) {
-
 	if err := authRequest(r); err != nil {
 		errLog.Println("authRequest:", err)
 		http.Error(w, "Error authorizing request", http.StatusUnauthorized)
@@ -361,7 +361,8 @@ func (filz *fbaStockFiles) getSuggestion() error {
 		}
 
 		sugQt := filz.getSugQt(sku, svD)
-		if sugQt == 0 {
+		if sugQt == 0 || sugQt == -1 {
+			delete(filz.CAData, sku)
 			continue
 		}
 
@@ -434,7 +435,7 @@ func (filz *fbaStockFiles) getSvData() (svDatas, error) {
 
 	svD := make(svDatas)
 	for _, prod := range resp.Products {
-		svD[prod.Sku] = svData{prod.Cost, prod.Classification, prod.Code, prod.Brand, prod.QuantityAvailable}
+		svD[prod.Sku] = svData{prod.Cost, prod.Classification, prod.Code, prod.Brand, prod.QuantityAvailable, prod.Description}
 	}
 
 	if len(skus) != len(svD) {
