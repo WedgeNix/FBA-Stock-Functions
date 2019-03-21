@@ -266,8 +266,10 @@ func (o *orders) matchQt() error {
 
 		qt, loc := getTotalLocs(svItem)
 		if qt == 0 {
-			msg.Text += "Qt of " + sku + " is now 0 so it will not be added to order."
+			msg.Text += " Qt of " + sku + " is now 0 so it will not be added to order."
 			slackerr.Send(slackHook, msg, nil)
+			delete(pub[brand], sku)
+			continue
 		}
 		itm := item{}
 		ord := make(order)
