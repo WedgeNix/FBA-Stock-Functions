@@ -187,6 +187,10 @@ func (o *orders) send() error {
 func (o *orders) makeOrder() error {
 	brandssOrd := []ssOrder{}
 	for brand, bOrd := range o.NewOrder {
+		if len(bOrd) == 0 {
+			continue
+		}
+
 		date := time.Now()
 		po := "FBA-" + brand + "-" + date.Format("20060102")
 		fDate := date.Format("2006-01-02T15:04:05.9999999")
@@ -217,7 +221,6 @@ func (o *orders) makeOrder() error {
 		}
 
 		itmz := []ssItem{}
-
 		for sku, ord := range bOrd {
 			itm := ssItem{}
 			itm.SKU = sku
@@ -264,40 +267,55 @@ func (o *orders) matchQt() error {
 			return err
 		}
 
-		qt, loc := getTotalLocs(svItem)
-		if qt == 0 {
-			msg.Text += " Qt of " + sku + " is now 0 so it will not be added to order."
-			slackerr.Send(slackHook, msg, nil)
-			delete(pub[brand], sku)
-			continue
-		}
 		itm := item{}
 		ord := make(order)
 		ord = pub[brand]
 		itm = ord[sku]
-		if qt < itm.Qt {
-			itm.Qt = qt
+
+		qt, loc := getOrdQtLocs(svItem, itm.Qt)
+		if qt == 0 {
+			msg.Text += " Qt of " + sku + " is now 0 or all items are in W1."
+			slackerr.Send(slackHook, msg, nil)
+			delete(ord, sku)
+			continue
 		}
+
+		itm.Qt = qt
 		itm.Location = loc
 		ord[sku] = itm
 		pub[brand] = ord
 	}
 
 	o.NewOrder = pub
-
 	return nil
 }
 
-func getTotalLocs(svLocs []inventory.SkuLocations) (int, string) {
-	qt := 0
+func getOrdQtLocs(svLocs []inventory.SkuLocations, ordQt int) (int, string) {
+	w2Qt := 0
+	w1Qt := 0
 	location := []string{}
 
 	for _, locs := range svLocs {
-		qt += locs.Quantity
+		if locs.WarehouseCode == "W1" {
+			w1Qt += locs.Quantity
+		} else if locs.WarehouseCode == "W2" {
+			w2Qt += locs.Quantity
+		}
+
 		location = append(location, locs.LocationCode+" ("+strconv.Itoa(locs.Quantity)+")")
 	}
+	allLocs := strings.Join(location, ",")
+	need := ordQt - w1Qt
 
-	return qt, strings.Join(location, ",")
+	if w2Qt == 0 || need <= 0 {
+		return 0, allLocs
+	}
+
+	if w2Qt < need {
+		need = w2Qt
+	}
+
+	return need, allLocs
 }
 
 func (o *orders) getBrand(sku string) (string, error) {
