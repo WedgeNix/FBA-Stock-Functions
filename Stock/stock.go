@@ -38,7 +38,7 @@ var (
 	errLog = log.New(os.Stderr, "FBAStock Error: ", 0)
 	// debug  = log.New(os.Stdout, "[debug] ", 0)
 
-	l = stdLog.Println
+	logP = stdLog.Println
 	// db = debug.Println
 )
 
@@ -49,6 +49,7 @@ type svData struct {
 	Brand       string
 	AvailableQt int
 	SvTitle     string
+	InboundQt   int
 }
 
 type svDatas map[string]svData
@@ -142,7 +143,7 @@ func Stock(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Error reading request", http.StatusBadRequest)
 		return
 	}
-	l(string(req))
+	logP(string(req))
 	// Parse json into struct
 	p := publishRequest{}
 	if err := json.Unmarshal(req, &p); err != nil {
@@ -159,7 +160,7 @@ func Stock(w http.ResponseWriter, r *http.Request) {
 		p.DeleteSource = false
 	}
 
-	l("pulling all drive files...")
+	logP("pulling all drive files...")
 	data, err := getDrive()
 	if err != nil {
 		errLog.Println("getDrive:", err)
@@ -167,7 +168,7 @@ func Stock(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	l("files successfully pulled now getting suggestions...")
+	logP("files successfully pulled now getting suggestions...")
 	err = data.getSuggestion()
 	if err != nil {
 		errLog.Println("getSuggestion:", err)
@@ -175,7 +176,7 @@ func Stock(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	l("adding sugested restock...")
+	logP("adding sugested restock...")
 	delScrCH <- p.DeleteSource
 	if err := <-errCH; err != nil {
 		errLog.Println("deleteSource:", err)
@@ -189,7 +190,7 @@ func Stock(w http.ResponseWriter, r *http.Request) {
 	}
 
 	json.NewEncoder(w).Encode(&newResp)
-	l("sent!")
+	logP("sent!")
 }
 
 func authRequest(r *http.Request) error {
@@ -294,7 +295,7 @@ func getDrive() (*fbaStockFiles, error) {
 
 func deleteSource(s *storage.Storage, files []storage.DriveFile) {
 	if <-delScrCH {
-		l("deleating source files.")
+		logP("deleating source files.")
 		for _, f := range files {
 			err := s.Drive.Files.Delete(f.ID).Do()
 			if err != nil {
@@ -354,11 +355,7 @@ func (filz *fbaStockFiles) getSuggestion() error {
 			alert.Alert += " [SKU had no sales on AMZ]"
 		}
 
-		restock := false
-		test := fbaRestockH{}
-		if filz.FBARestock[sku] != test {
-			restock = true
-		}
+		_, restock := filz.FBARestock[sku]
 
 		sugQt := filz.getSugQt(sku, svD)
 		if sugQt == 0 || sugQt == -1 {
@@ -395,6 +392,11 @@ func (filz *fbaStockFiles) getSugQt(sku string, svd svData) int {
 	available := svd.AvailableQt
 	if qt > available {
 		qt = available
+	}
+
+	qt -= svd.InboundQt
+	if qt < 2 {
+		qt = 0
 	}
 
 	return qt
@@ -435,7 +437,14 @@ func (filz *fbaStockFiles) getSvData() (svDatas, error) {
 
 	svD := make(svDatas)
 	for _, prod := range resp.Products {
-		svD[prod.Sku] = svData{prod.Cost, prod.Classification, prod.Code, prod.Brand, prod.QuantityAvailable, prod.Description}
+		svD[prod.Sku] = svData{
+			Cost:        prod.Cost,
+			Class:       prod.Classification,
+			UPC:         prod.Code,
+			Brand:       prod.Brand,
+			AvailableQt: prod.QuantityAvailable,
+			SvTitle:     prod.Description,
+			InboundQt:   prod.QuantityInbound}
 	}
 
 	if len(skus) != len(svD) {
@@ -498,6 +507,10 @@ func (filz *fbaStockFiles) mapDataView(data []amzViewsH) {
 
 	for _, row := range data {
 		sku := row.SKU
+		if row.Sessions == 0 {
+			continue
+		}
+
 		vu[sku] = row
 	}
 

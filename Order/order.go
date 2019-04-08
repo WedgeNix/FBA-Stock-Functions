@@ -23,7 +23,7 @@ var (
 	// logs
 	stdLog = log.New(os.Stdout, "FBAStock: ", 0)
 	errLog = log.New(os.Stderr, "FBAStock Error: ", 0)
-	l      = stdLog.Println
+	logP   = stdLog.Println
 
 	slackHook = os.Getenv("SLACK_HOOK")
 	attach    = []slackerr.Attachments{slackerr.Attachments{
@@ -96,7 +96,7 @@ func Order(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	l("done with machQt now makeing SS order")
+	logP("done with machQt now makeing SS order")
 	err = ordrz.makeOrder()
 	if err != nil {
 		errLog.Println("makeOrder:", err)
@@ -104,7 +104,7 @@ func Order(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	l("done with making orders now sending to ShipStaion...")
+	logP("done with making orders now sending to ShipStaion...")
 	err = ordrz.send()
 	if err != nil {
 		errLog.Println("send:", err)
@@ -112,13 +112,20 @@ func Order(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	l("done sending to ShipStaion...")
+	logP("done sending to ShipStaion...")
+
+	err = ordrz.sendSV()
+	if err != nil {
+		errLog.Println("send:", err)
+		http.Error(w, "Server error sending to SKU Vault", http.StatusInternalServerError)
+		return
+	}
 	newResp := apiRespond{
 		NewOrder: ordrz.NewOrder,
 	}
 
 	json.NewEncoder(w).Encode(&newResp)
-	l("sent!")
+	logP("sent!")
 }
 
 func authRequest(r *http.Request) error {
@@ -192,7 +199,7 @@ func (o *orders) makeOrder() error {
 		}
 
 		date := time.Now()
-		po := "FBA-" + brand + "-" + date.Format("20060102")
+		po := "FBA-" + "-" + date.Format("20060102") + brand
 		fDate := date.Format("2006-01-02T15:04:05.9999999")
 		ssOr := ssOrder{
 			OrderNumber: po,
